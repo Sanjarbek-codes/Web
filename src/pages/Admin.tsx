@@ -3,7 +3,7 @@ import { Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom'
 import { LayoutDashboard, FolderKanban, Settings, LogOut, Plus, Trash2, BarChart3, Users, Eye, UploadCloud, Image as ImageIcon, X, MessageSquare, Award, Code, Briefcase, MonitorSmartphone, Server, PenTool, GraduationCap, Globe, Github, ExternalLink } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { auth, db, isFirebaseConfigured } from '../lib/firebase';
-import { collection, addDoc, deleteDoc, doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, deleteDoc, doc, onSnapshot, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { motion, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
@@ -241,8 +241,9 @@ const ProjectsManager = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [formData, setFormData] = useState({
-    title: '', desc: '', image: '', tag: '', link: '', githubUrl: '', color: 'bg-[#f5f5f7]'
+    title: '', desc: '', image: '', tag: '', link: '', githubUrl: '', downloadUrl: '', color: 'bg-[#f5f5f7]'
   });
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isFirebaseConfigured || !db) {
@@ -314,15 +315,38 @@ const ProjectsManager = () => {
     }
 
     try {
-      const toastId = toast.loading("Loyiha saqlanmoqda...");
-      await addDoc(collection(db, 'projects'), formData);
-      toast.success("Loyiha muvaffaqiyatli qo'shildi!", { id: toastId });
+      const toastId = toast.loading(editingId ? "Loyiha yangilanmoqda..." : "Loyiha saqlanmoqda...");
+      
+      if (editingId) {
+        await updateDoc(doc(db, 'projects', editingId), formData);
+        toast.success("Loyiha muvaffaqiyatli yangilandi!", { id: toastId });
+      } else {
+        await addDoc(collection(db, 'projects'), formData);
+        toast.success("Loyiha muvaffaqiyatli qo'shildi!", { id: toastId });
+      }
+      
       setIsAdding(false);
-      setFormData({ title: '', desc: '', image: '', tag: '', link: '', githubUrl: '', color: 'bg-[#f5f5f7]' });
+      setEditingId(null);
+      setFormData({ title: '', desc: '', image: '', tag: '', link: '', githubUrl: '', downloadUrl: '', color: 'bg-[#f5f5f7]' });
     } catch (error) {
-      console.error("Error adding document: ", error);
-      toast.error("Loyiha qo'shishda xatolik yuz berdi");
+      console.error("Error saving document: ", error);
+      toast.error("Xatolik yuz berdi");
     }
+  };
+
+  const handleEdit = (project: any) => {
+    setFormData({
+      title: project.title || '',
+      desc: project.desc || '',
+      image: project.image || '',
+      tag: project.tag || '',
+      link: project.link || '',
+      githubUrl: project.githubUrl || '',
+      downloadUrl: project.downloadUrl || '',
+      color: project.color || 'bg-[#f5f5f7]'
+    });
+    setEditingId(project.id);
+    setIsAdding(true);
   };
 
   const handleDelete = async (id: string) => {
@@ -367,7 +391,9 @@ const ProjectsManager = () => {
             transition={{ duration: 0.3 }}
           >
             <div className="bg-white dark:bg-[#1d1d1f] p-8 rounded-[2rem] shadow-xl shadow-black/5 border border-white/20 mb-8">
-              <h3 className="text-2xl font-bold mb-8 text-[#1d1d1f] dark:text-white">Yangi loyiha qo'shish</h3>
+              <h3 className="text-2xl font-bold mb-8 text-[#1d1d1f] dark:text-white">
+                {editingId ? "Loyihani tahrirlash" : "Yangi loyiha qo'shish"}
+              </h3>
               <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-bold text-[#1d1d1f] dark:text-gray-300 mb-2 uppercase tracking-wider">Sarlavha</label>
@@ -384,6 +410,10 @@ const ProjectsManager = () => {
                 <div className="md:col-span-1">
                   <label className="block text-sm font-bold text-[#1d1d1f] dark:text-gray-300 mb-2 uppercase tracking-wider">GitHub Kodi (Link)</label>
                   <input type="url" value={formData.githubUrl} onChange={e => setFormData({...formData, githubUrl: e.target.value})} className="w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl py-4 px-5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-[#1d1d1f] dark:text-white font-medium" placeholder="https://github.com/..." />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-bold text-[#1d1d1f] dark:text-gray-300 mb-2 uppercase tracking-wider">Yuklab olish havolasi (Download Link)</label>
+                  <input type="url" value={formData.downloadUrl} onChange={e => setFormData({...formData, downloadUrl: e.target.value})} className="w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl py-4 px-5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-[#1d1d1f] dark:text-white font-medium" placeholder="https://... (zip/exe/etc)" />
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-bold text-[#1d1d1f] dark:text-gray-300 mb-2 uppercase tracking-wider">Qisqacha ta'rif</label>
@@ -429,14 +459,27 @@ const ProjectsManager = () => {
                   </div>
                 </div>
 
-                <div className="md:col-span-2">
+                <div className="md:col-span-2 flex gap-4">
                   <button 
                     type="submit" 
                     disabled={isUploading || !formData.image}
                     className="bg-blue-600 text-white px-10 py-4 rounded-xl font-bold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full md:w-auto shadow-lg shadow-blue-500/30"
                   >
-                    Saqlash va Nashr etish
+                    {editingId ? "Yangilash va Saqlash" : "Saqlash va Nashr etish"}
                   </button>
+                  {editingId && (
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        setIsAdding(false);
+                        setEditingId(null);
+                        setFormData({ title: '', desc: '', image: '', tag: '', link: '', githubUrl: '', downloadUrl: '', color: 'bg-[#f5f5f7]' });
+                      }}
+                      className="bg-gray-200 dark:bg-white/10 text-gray-700 dark:text-white px-10 py-4 rounded-xl font-bold hover:bg-gray-300 dark:hover:bg-white/20 transition-colors w-full md:w-auto"
+                    >
+                      Bekor qilish
+                    </button>
+                  )}
                 </div>
               </form>
             </div>
@@ -468,6 +511,13 @@ const ProjectsManager = () => {
               <img src={project.image} alt={project.title} className="w-full h-full object-cover transition-transform duration-700" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-100">
+                <button 
+                  onClick={() => handleEdit(project)}
+                  className="w-12 h-12 bg-white/90 backdrop-blur rounded-full flex items-center justify-center text-blue-500 hover:bg-blue-500 hover:text-white transition-colors shadow-lg"
+                  title="Tahrirlash"
+                >
+                  <PenTool size={20} />
+                </button>
                 <DeleteButton 
                   onConfirm={() => handleDelete(project.id)} 
                   title="Loyihani o'chirish" 
@@ -497,6 +547,7 @@ const ExperienceManager = () => {
   const [experiences, setExperiences] = useState<any[]>([]);
   const [formData, setFormData] = useState({ role: '', company: '', year: '', desc: '' });
   const [isAdding, setIsAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isFirebaseConfigured || !db) return;
@@ -506,15 +557,28 @@ const ExperienceManager = () => {
     return () => unsubscribe();
   }, []);
 
-  const handleAdd = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await addDoc(collection(db, 'experiences'), formData);
+      if (editingId) {
+        await updateDoc(doc(db, 'experiences', editingId), formData);
+        toast.success("Tajriba yangilandi");
+      } else {
+        await addDoc(collection(db, 'experiences'), formData);
+        toast.success("Tajriba qo'shildi");
+      }
       setFormData({ role: '', company: '', year: '', desc: '' });
-      toast.success("Tajriba qo'shildi");
+      setIsAdding(false);
+      setEditingId(null);
     } catch (e) {
       toast.error("Xatolik");
     }
+  };
+
+  const handleEdit = (exp: any) => {
+    setFormData({ role: exp.role, company: exp.company, year: exp.year, desc: exp.desc });
+    setEditingId(exp.id);
+    setIsAdding(true);
   };
 
   const handleDelete = async (id: string) => {
@@ -540,7 +604,13 @@ const ExperienceManager = () => {
           <p className="text-gray-500 mt-2 font-medium">Ish tajribasi va faoliyat</p>
         </div>
         <button 
-          onClick={() => setIsAdding(!isAdding)}
+          onClick={() => {
+            setIsAdding(!isAdding);
+            if (isAdding) {
+              setEditingId(null);
+              setFormData({ role: '', company: '', year: '', desc: '' });
+            }
+          }}
           className="bg-[#1d1d1f] dark:bg-white text-white dark:text-black px-6 py-3 rounded-full font-bold flex items-center gap-2 hover:opacity-90 transition-opacity shadow-lg shadow-black/10"
         >
           {isAdding ? 'Bekor qilish' : <><Plus size={20} /> Yangi qo'shish</>}
@@ -556,8 +626,10 @@ const ExperienceManager = () => {
             transition={{ duration: 0.3 }}
           >
             <div className="bg-white dark:bg-[#1d1d1f] p-8 rounded-[2rem] shadow-xl shadow-black/5 border border-white/20 mb-8">
-              <h3 className="text-2xl font-bold mb-8 text-[#1d1d1f] dark:text-white">Yangi tajriba qo'shish</h3>
-              <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <h3 className="text-2xl font-bold mb-8 text-[#1d1d1f] dark:text-white">
+                {editingId ? "Tajribani tahrirlash" : "Yangi tajriba qo'shish"}
+              </h3>
+              <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-bold text-[#1d1d1f] dark:text-gray-300 mb-2 uppercase tracking-wider">Lavozim</label>
                   <input required type="text" value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} className="w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl py-4 px-5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-[#1d1d1f] dark:text-white font-medium" placeholder="Frontend Developer" />
@@ -576,7 +648,7 @@ const ExperienceManager = () => {
                 </div>
                 <div className="md:col-span-2">
                   <button type="submit" className="bg-blue-600 text-white px-8 py-4 rounded-xl font-bold hover:bg-blue-700 transition-colors w-full md:w-auto shadow-lg shadow-blue-500/30">
-                    Tajriba qo'shish
+                    {editingId ? "Yangilash va Saqlash" : "Tajriba qo'shish"}
                   </button>
                 </div>
               </form>
@@ -600,12 +672,21 @@ const ExperienceManager = () => {
                 <p className="text-base text-gray-600 dark:text-gray-300 font-medium mb-2">{exp.company}</p>
                 <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed max-w-2xl">{exp.desc}</p>
               </div>
-              <DeleteButton 
-                onConfirm={() => handleDelete(exp.id)} 
-                title="Tajribani o'chirish" 
-                message="Haqiqatan ham bu tajribani o'chirmoqchimisiz?"
-                className="text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 p-3 rounded-xl transition-all opacity-0 group-hover:opacity-100"
-              />
+              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button 
+                  onClick={() => handleEdit(exp)}
+                  className="text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 p-3 rounded-xl transition-all"
+                  title="Tahrirlash"
+                >
+                  <PenTool size={18} />
+                </button>
+                <DeleteButton 
+                  onConfirm={() => handleDelete(exp.id)} 
+                  title="Tajribani o'chirish" 
+                  message="Haqiqatan ham bu tajribani o'chirmoqchimisiz?"
+                  className="text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 p-3 rounded-xl transition-all"
+                />
+              </div>
             </motion.div>
           ))}
         </div>
@@ -618,6 +699,7 @@ const EducationManager = () => {
   const [education, setEducation] = useState<any[]>([]);
   const [formData, setFormData] = useState({ degree: '', institution: '', year: '', desc: '' });
   const [isAdding, setIsAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isFirebaseConfigured || !db) return;
@@ -627,15 +709,28 @@ const EducationManager = () => {
     return () => unsubscribe();
   }, []);
 
-  const handleAdd = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await addDoc(collection(db, 'education'), formData);
+      if (editingId) {
+        await updateDoc(doc(db, 'education', editingId), formData);
+        toast.success("Ta'lim yangilandi");
+      } else {
+        await addDoc(collection(db, 'education'), formData);
+        toast.success("Ta'lim qo'shildi");
+      }
       setFormData({ degree: '', institution: '', year: '', desc: '' });
-      toast.success("Ta'lim qo'shildi");
+      setIsAdding(false);
+      setEditingId(null);
     } catch (e) {
       toast.error("Xatolik");
     }
+  };
+
+  const handleEdit = (edu: any) => {
+    setFormData({ degree: edu.degree, institution: edu.institution, year: edu.year, desc: edu.desc });
+    setEditingId(edu.id);
+    setIsAdding(true);
   };
 
   const handleDelete = async (id: string) => {
@@ -661,7 +756,13 @@ const EducationManager = () => {
           <p className="text-gray-500 mt-2 font-medium">O'qish joylari va darajalar</p>
         </div>
         <button 
-          onClick={() => setIsAdding(!isAdding)}
+          onClick={() => {
+            setIsAdding(!isAdding);
+            if (isAdding) {
+              setEditingId(null);
+              setFormData({ degree: '', institution: '', year: '', desc: '' });
+            }
+          }}
           className="bg-[#1d1d1f] dark:bg-white text-white dark:text-black px-6 py-3 rounded-full font-bold flex items-center gap-2 hover:opacity-90 transition-opacity shadow-lg shadow-black/10"
         >
           {isAdding ? 'Bekor qilish' : <><Plus size={20} /> Yangi qo'shish</>}
@@ -677,8 +778,10 @@ const EducationManager = () => {
             transition={{ duration: 0.3 }}
           >
             <div className="bg-white dark:bg-[#1d1d1f] p-8 rounded-[2rem] shadow-xl shadow-black/5 border border-white/20 mb-8">
-              <h3 className="text-2xl font-bold mb-8 text-[#1d1d1f] dark:text-white">Yangi ta'lim qo'shish</h3>
-              <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <h3 className="text-2xl font-bold mb-8 text-[#1d1d1f] dark:text-white">
+                {editingId ? "Ta'limni tahrirlash" : "Yangi ta'lim qo'shish"}
+              </h3>
+              <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-bold text-[#1d1d1f] dark:text-gray-300 mb-2 uppercase tracking-wider">Daraja / Yo'nalish</label>
                   <input required type="text" value={formData.degree} onChange={e => setFormData({...formData, degree: e.target.value})} className="w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl py-4 px-5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-[#1d1d1f] dark:text-white font-medium" placeholder="Bakalavr..." />
@@ -697,7 +800,7 @@ const EducationManager = () => {
                 </div>
                 <div className="md:col-span-2">
                   <button type="submit" className="bg-blue-600 text-white px-8 py-4 rounded-xl font-bold hover:bg-blue-700 transition-colors w-full md:w-auto shadow-lg shadow-blue-500/30">
-                    Ta'lim qo'shish
+                    {editingId ? "Yangilash va Saqlash" : "Ta'lim qo'shish"}
                   </button>
                 </div>
               </form>
@@ -721,12 +824,21 @@ const EducationManager = () => {
                 <p className="text-base text-gray-600 dark:text-gray-300 font-medium mb-2">{edu.institution}</p>
                 <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed max-w-2xl">{edu.desc}</p>
               </div>
-              <DeleteButton 
-                onConfirm={() => handleDelete(edu.id)} 
-                title="Ta'limni o'chirish" 
-                message="Haqiqatan ham bu ta'limni o'chirmoqchimisiz?"
-                className="text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 p-3 rounded-xl transition-all opacity-0 group-hover:opacity-100"
-              />
+              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button 
+                  onClick={() => handleEdit(edu)}
+                  className="text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 p-3 rounded-xl transition-all"
+                  title="Tahrirlash"
+                >
+                  <PenTool size={18} />
+                </button>
+                <DeleteButton 
+                  onConfirm={() => handleDelete(edu.id)} 
+                  title="Ta'limni o'chirish" 
+                  message="Haqiqatan ham bu ta'limni o'chirmoqchimisiz?"
+                  className="text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 p-3 rounded-xl transition-all"
+                />
+              </div>
             </motion.div>
           ))}
         </div>
@@ -737,9 +849,9 @@ const EducationManager = () => {
 
 const SkillsManager = () => {
   const [skills, setSkills] = useState<any[]>([]);
-  const [name, setName] = useState('');
-  const [level, setLevel] = useState('50');
+  const [formData, setFormData] = useState({ name: '', level: '50' });
   const [isAdding, setIsAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isFirebaseConfigured || !db) return;
@@ -749,16 +861,30 @@ const SkillsManager = () => {
     return () => unsubscribe();
   }, []);
 
-  const handleAdd = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !level) return;
+    if (!formData.name || !formData.level) return;
     try {
-      await addDoc(collection(db, 'skills'), { name, level: parseInt(level) });
-      setName(''); setLevel('50');
-      toast.success("Ko'nikma qo'shildi");
+      const data = { name: formData.name, level: parseInt(formData.level) };
+      if (editingId) {
+        await updateDoc(doc(db, 'skills', editingId), data);
+        toast.success("Ko'nikma yangilandi");
+      } else {
+        await addDoc(collection(db, 'skills'), data);
+        toast.success("Ko'nikma qo'shildi");
+      }
+      setFormData({ name: '', level: '50' });
+      setIsAdding(false);
+      setEditingId(null);
     } catch (e) {
       toast.error("Xatolik");
     }
+  };
+
+  const handleEdit = (skill: any) => {
+    setFormData({ name: skill.name, level: String(skill.level) });
+    setEditingId(skill.id);
+    setIsAdding(true);
   };
 
   const handleDelete = async (id: string) => {
@@ -784,7 +910,13 @@ const SkillsManager = () => {
           <p className="text-gray-500 mt-2 font-medium">Dasturlash tillari va texnologiyalar</p>
         </div>
         <button 
-          onClick={() => setIsAdding(!isAdding)}
+          onClick={() => {
+            setIsAdding(!isAdding);
+            if (isAdding) {
+              setEditingId(null);
+              setFormData({ name: '', level: '50' });
+            }
+          }}
           className="bg-[#1d1d1f] dark:bg-white text-white dark:text-black px-6 py-3 rounded-full font-bold flex items-center gap-2 hover:opacity-90 transition-opacity shadow-lg shadow-black/10"
         >
           {isAdding ? 'Bekor qilish' : <><Plus size={20} /> Yangi qo'shish</>}
@@ -800,18 +932,20 @@ const SkillsManager = () => {
             transition={{ duration: 0.3 }}
           >
             <div className="bg-white dark:bg-[#1d1d1f] p-8 rounded-[2rem] shadow-xl shadow-black/5 border border-white/20 mb-8">
-              <h3 className="text-2xl font-bold mb-8 text-[#1d1d1f] dark:text-white">Yangi ko'nikma qo'shish</h3>
-              <form onSubmit={handleAdd} className="flex flex-col md:flex-row gap-6 items-end">
+              <h3 className="text-2xl font-bold mb-8 text-[#1d1d1f] dark:text-white">
+                {editingId ? "Ko'nikmani tahrirlash" : "Yangi ko'nikma qo'shish"}
+              </h3>
+              <form onSubmit={handleSubmit} className="flex flex-col md:flex-row gap-6 items-end">
                 <div className="flex-1 w-full">
                   <label className="block text-sm font-bold text-[#1d1d1f] dark:text-gray-300 mb-2 uppercase tracking-wider">Nomi</label>
-                  <input required type="text" value={name} onChange={e => setName(e.target.value)} className="w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl py-4 px-5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-[#1d1d1f] dark:text-white font-medium" placeholder="React, Node.js..." />
+                  <input required type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl py-4 px-5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-[#1d1d1f] dark:text-white font-medium" placeholder="React, Node.js..." />
                 </div>
                 <div className="w-full md:w-48">
                   <label className="block text-sm font-bold text-[#1d1d1f] dark:text-gray-300 mb-2 uppercase tracking-wider">Daraja (%)</label>
-                  <input required type="number" min="0" max="100" value={level} onChange={e => setLevel(e.target.value)} className="w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl py-4 px-5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-[#1d1d1f] dark:text-white font-medium" />
+                  <input required type="number" min="0" max="100" value={formData.level} onChange={e => setFormData({...formData, level: e.target.value})} className="w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl py-4 px-5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-[#1d1d1f] dark:text-white font-medium" />
                 </div>
                 <button type="submit" className="bg-blue-600 text-white px-8 py-4 rounded-xl font-bold hover:bg-blue-700 transition-colors w-full md:w-auto h-[58px] shadow-lg shadow-blue-500/30">
-                  Qo'shish
+                  {editingId ? "Yangilash" : "Qo'shish"}
                 </button>
               </form>
             </div>
@@ -838,12 +972,20 @@ const SkillsManager = () => {
                   <div className="bg-blue-600 h-full rounded-full transition-all duration-500" style={{ width: `${s.level}%` }}></div>
                 </div>
               </div>
-              <DeleteButton 
-                onConfirm={() => handleDelete(s.id)} 
-                title="Ko'nikmani o'chirish" 
-                message="Haqiqatan ham bu ko'nikmani o'chirmoqchimisiz?"
-                className="text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 p-3 rounded-xl transition-all opacity-0 group-hover:opacity-100 ml-4"
-              />
+              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-4">
+                <button 
+                  onClick={() => handleEdit(s)}
+                  className="text-gray-400 hover:text-blue-500 p-2 rounded-lg transition-colors"
+                >
+                  <PenTool size={16} />
+                </button>
+                <DeleteButton 
+                  onConfirm={() => handleDelete(s.id)} 
+                  title="Ko'nikmani o'chirish" 
+                  message="Haqiqatan ham bu ko'nikmani o'chirmoqchimisiz?"
+                  className="text-gray-400 hover:text-red-500 p-2 rounded-lg transition-colors"
+                />
+              </div>
             </motion.div>
           ))}
         </div>
@@ -856,6 +998,7 @@ const CertificatesManager = () => {
   const [certs, setCerts] = useState<any[]>([]);
   const [formData, setFormData] = useState({ title: '', issuer: '', year: '', link: '' });
   const [isAdding, setIsAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isFirebaseConfigured || !db) return;
@@ -865,15 +1008,28 @@ const CertificatesManager = () => {
     return () => unsubscribe();
   }, []);
 
-  const handleAdd = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await addDoc(collection(db, 'certificates'), formData);
+      if (editingId) {
+        await updateDoc(doc(db, 'certificates', editingId), formData);
+        toast.success("Sertifikat yangilandi");
+      } else {
+        await addDoc(collection(db, 'certificates'), formData);
+        toast.success("Sertifikat qo'shildi");
+      }
       setFormData({ title: '', issuer: '', year: '', link: '' });
-      toast.success("Sertifikat qo'shildi");
+      setIsAdding(false);
+      setEditingId(null);
     } catch (e) {
       toast.error("Xatolik");
     }
+  };
+
+  const handleEdit = (cert: any) => {
+    setFormData({ title: cert.title, issuer: cert.issuer, year: cert.year, link: cert.link });
+    setEditingId(cert.id);
+    setIsAdding(true);
   };
 
   const handleDelete = async (id: string) => {
@@ -899,7 +1055,13 @@ const CertificatesManager = () => {
           <p className="text-gray-500 mt-2 font-medium">Yutuqlar va sertifikatlar</p>
         </div>
         <button 
-          onClick={() => setIsAdding(!isAdding)}
+          onClick={() => {
+            setIsAdding(!isAdding);
+            if (isAdding) {
+              setEditingId(null);
+              setFormData({ title: '', issuer: '', year: '', link: '' });
+            }
+          }}
           className="bg-[#1d1d1f] dark:bg-white text-white dark:text-black px-6 py-3 rounded-full font-bold flex items-center gap-2 hover:opacity-90 transition-opacity shadow-lg shadow-black/10"
         >
           {isAdding ? 'Bekor qilish' : <><Plus size={20} /> Yangi qo'shish</>}
@@ -915,8 +1077,10 @@ const CertificatesManager = () => {
             transition={{ duration: 0.3 }}
           >
             <div className="bg-white dark:bg-[#1d1d1f] p-8 rounded-[2rem] shadow-xl shadow-black/5 border border-white/20 mb-8">
-              <h3 className="text-2xl font-bold mb-8 text-[#1d1d1f] dark:text-white">Yangi sertifikat qo'shish</h3>
-              <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <h3 className="text-2xl font-bold mb-8 text-[#1d1d1f] dark:text-white">
+                {editingId ? "Sertifikatni tahrirlash" : "Yangi sertifikat qo'shish"}
+              </h3>
+              <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-bold text-[#1d1d1f] dark:text-gray-300 mb-2 uppercase tracking-wider">Nomi</label>
                   <input required type="text" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className="w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl py-4 px-5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-[#1d1d1f] dark:text-white font-medium" placeholder="AWS Certified..." />
@@ -935,7 +1099,7 @@ const CertificatesManager = () => {
                 </div>
                 <div className="md:col-span-2">
                   <button type="submit" className="bg-blue-600 text-white px-8 py-4 rounded-xl font-bold hover:bg-blue-700 transition-colors w-full md:w-auto shadow-lg shadow-blue-500/30">
-                    Sertifikat qo'shish
+                    {editingId ? "Yangilash va Saqlash" : "Sertifikat qo'shish"}
                   </button>
                 </div>
               </form>
@@ -959,12 +1123,21 @@ const CertificatesManager = () => {
                 <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">{c.issuer} • {c.year}</p>
                 {c.link && <a href={c.link} target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 text-xs font-bold uppercase tracking-wider mt-2 inline-block hover:underline">Sertifikatni ko'rish</a>}
               </div>
-              <DeleteButton 
-                onConfirm={() => handleDelete(c.id)} 
-                title="Sertifikatni o'chirish" 
-                message="Haqiqatan ham bu sertifikatni o'chirmoqchimisiz?"
-                className="text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 p-3 rounded-xl transition-all opacity-0 group-hover:opacity-100"
-              />
+              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button 
+                  onClick={() => handleEdit(c)}
+                  className="text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 p-3 rounded-xl transition-all"
+                  title="Tahrirlash"
+                >
+                  <PenTool size={18} />
+                </button>
+                <DeleteButton 
+                  onConfirm={() => handleDelete(c.id)} 
+                  title="Sertifikatni o'chirish" 
+                  message="Haqiqatan ham bu sertifikatni o'chirmoqchimisiz?"
+                  className="text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 p-3 rounded-xl transition-all"
+                />
+              </div>
             </motion.div>
           ))}
         </div>
@@ -977,6 +1150,7 @@ const ServicesManager = () => {
   const [services, setServices] = useState<any[]>([]);
   const [formData, setFormData] = useState({ title: '', desc: '', icon: 'Code' });
   const [isAdding, setIsAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isFirebaseConfigured || !db) return;
@@ -986,15 +1160,28 @@ const ServicesManager = () => {
     return () => unsubscribe();
   }, []);
 
-  const handleAdd = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await addDoc(collection(db, 'services'), formData);
+      if (editingId) {
+        await updateDoc(doc(db, 'services', editingId), formData);
+        toast.success("Xizmat yangilandi");
+      } else {
+        await addDoc(collection(db, 'services'), formData);
+        toast.success("Xizmat qo'shildi");
+      }
       setFormData({ title: '', desc: '', icon: 'Code' });
-      toast.success("Xizmat qo'shildi");
+      setIsAdding(false);
+      setEditingId(null);
     } catch (e) {
       toast.error("Xatolik");
     }
+  };
+
+  const handleEdit = (service: any) => {
+    setFormData({ title: service.title, desc: service.desc, icon: service.icon });
+    setEditingId(service.id);
+    setIsAdding(true);
   };
 
   const handleDelete = async (id: string) => {
@@ -1020,7 +1207,13 @@ const ServicesManager = () => {
           <p className="text-gray-500 mt-2 font-medium">Taklif etiladigan xizmatlar</p>
         </div>
         <button 
-          onClick={() => setIsAdding(!isAdding)}
+          onClick={() => {
+            setIsAdding(!isAdding);
+            if (isAdding) {
+              setEditingId(null);
+              setFormData({ title: '', desc: '', icon: 'Code' });
+            }
+          }}
           className="bg-[#1d1d1f] dark:bg-white text-white dark:text-black px-6 py-3 rounded-full font-bold flex items-center gap-2 hover:opacity-90 transition-opacity shadow-lg shadow-black/10"
         >
           {isAdding ? 'Bekor qilish' : <><Plus size={20} /> Yangi qo'shish</>}
@@ -1036,8 +1229,10 @@ const ServicesManager = () => {
             transition={{ duration: 0.3 }}
           >
             <div className="bg-white dark:bg-[#1d1d1f] p-8 rounded-[2rem] shadow-xl shadow-black/5 border border-white/20 mb-8">
-              <h3 className="text-2xl font-bold mb-8 text-[#1d1d1f] dark:text-white">Yangi xizmat qo'shish</h3>
-              <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <h3 className="text-2xl font-bold mb-8 text-[#1d1d1f] dark:text-white">
+                {editingId ? "Xizmatni tahrirlash" : "Yangi xizmat qo'shish"}
+              </h3>
+              <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-bold text-[#1d1d1f] dark:text-gray-300 mb-2 uppercase tracking-wider">Nomi</label>
                   <input required type="text" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className="w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl py-4 px-5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-[#1d1d1f] dark:text-white font-medium" placeholder="Web Dasturlash" />
@@ -1057,7 +1252,7 @@ const ServicesManager = () => {
                 </div>
                 <div className="md:col-span-2">
                   <button type="submit" className="bg-blue-600 text-white px-8 py-4 rounded-xl font-bold hover:bg-blue-700 transition-colors w-full md:w-auto shadow-lg shadow-blue-500/30">
-                    Xizmat qo'shish
+                    {editingId ? "Yangilash va Saqlash" : "Xizmat qo'shish"}
                   </button>
                 </div>
               </form>
@@ -1080,12 +1275,20 @@ const ServicesManager = () => {
                 <p className="text-xl font-bold text-[#1d1d1f] dark:text-white mb-1">{s.title}</p>
                 <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">{s.desc}</p>
               </div>
-              <DeleteButton 
-                onConfirm={() => handleDelete(s.id)} 
-                title="Xizmatni o'chirish" 
-                message="Haqiqatan ham bu xizmatni o'chirmoqchimisiz?"
-                className="text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 p-3 rounded-xl transition-all opacity-0 group-hover:opacity-100"
-              />
+              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button 
+                  onClick={() => handleEdit(s)}
+                  className="text-gray-400 hover:text-blue-500 p-2 rounded-lg transition-colors"
+                >
+                  <PenTool size={18} />
+                </button>
+                <DeleteButton 
+                  onConfirm={() => handleDelete(s.id)} 
+                  title="Xizmatni o'chirish" 
+                  message="Haqiqatan ham bu xizmatni o'chirmoqchimisiz?"
+                  className="text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 p-3 rounded-xl transition-all"
+                />
+              </div>
             </motion.div>
           ))}
         </div>

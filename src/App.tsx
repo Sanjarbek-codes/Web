@@ -10,29 +10,32 @@ import Portfolio from './pages/Portfolio';
 import Login from './pages/Login';
 import Admin from './pages/Admin';
 import CVBuilder from './pages/CVBuilder';
+import { LanguageProvider } from './lib/LanguageContext';
 
 export default function App() {
   return (
-    <Router>
-      <Toaster 
-        position="top-center"
-        toastOptions={{
-          style: {
-            background: '#1d1d1f',
-            color: '#fff',
-            borderRadius: '16px',
-            padding: '16px 24px',
-            fontSize: '14px',
-            fontWeight: '500'
-          },
-        }}
-      />
-      <Routes>
-        <Route path="/" element={<Portfolio />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/admin/*" element={<Admin />} />
-        <Route path="/cv-builder" element={<CVBuilder />} />
-      </Routes>
-    </Router>
+    <LanguageProvider>
+      <Router>
+        <Toaster 
+          position="top-center"
+          toastOptions={{
+            style: {
+              background: '#1d1d1f',
+              color: '#fff',
+              borderRadius: '16px',
+              padding: '16px 24px',
+              fontSize: '14px',
+              fontWeight: '500'
+            },
+          }}
+        />
+        <Routes>
+          <Route path="/" element={<Portfolio />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/admin/*" element={<Admin />} />
+          <Route path="/cv-builder" element={<CVBuilder />} />
+        </Routes>
+      </Router>
+    </LanguageProvider>
   );
 }
