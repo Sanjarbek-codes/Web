@@ -438,7 +438,7 @@ const Hero = ({ settings }: { settings: any }) => {
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
                     </span>
-                    {lang === 'UZ' ? "Freelance uchun bo'shman" : lang === 'RU' ? "Доступен для фриланса" : "Available for freelance"}
+                    {lang === 'UZ' ? "Hozircha Bandman" : lang === 'RU' ? "Доступен для фриланса" : "Available for freelance"}
                   </div>
                   <LocalTime />
                 </div>
