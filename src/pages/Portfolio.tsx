@@ -666,7 +666,7 @@ const Hero = ({ settings }: { settings: any }) => {
               className="relative w-full h-full rounded-full overflow-hidden border-4 border-white/20 dark:border-white/10 shadow-2xl transform-gpu"
             >
                 <img 
-                src={heroImage || "https://picsum.photos/seed/sanjarbek/800/800"} 
+                src={heroImage || ""} 
                 alt="Sanjarbek Otabekov" 
                 className="w-full h-full object-cover transition-transform duration-700 hover:scale-110"
                 referrerPolicy="no-referrer"
