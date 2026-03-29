@@ -94,9 +94,8 @@ export const translations = {
       title: "Mijozlar Fikri",
       subtitle: "Men bilan ishlagan insonlar nima deydi?",
       items: [
-        { name: "Azizbek Rahimov", role: "CEO, TechStart", text: "Sanjarbek bilan ishlash juda oson kechdi. U bizning talablarimizni tez tushundi va ajoyib veb-ilova yaratib berdi." },
-        { name: "Malika Karimova", role: "Marketing Menejer", text: "Dizayn va funksionallik uyg'unligi ajoyib. Saytimizning konversiya darajasi sezilarli darajada oshdi." },
-        { name: "Sardor Aliyev", role: "Startup Asoschisi", text: "O'z ishining ustasi. Murakkab muammolarga oddiy va samarali yechimlar topa oladi. Tavsiya qilaman!" }
+        
+        { name: "Mijoz", role: "Mebel Do`koni", text: "Sanjarbek bizning saytimizni ajoyib va sifatli tarzda ishlab chiqdi" }
       ]
     },
     footer: {
@@ -300,9 +299,7 @@ export const translations = {
       title: "Testimonials",
       subtitle: "What people I've worked with say?",
       items: [
-        { name: "Azizbek Rahimov", role: "CEO, TechStart", text: "Working with Sanjarbek was very easy. He quickly understood our requirements and created a great web application." },
-        { name: "Malika Karimova", role: "Marketing Manager", text: "The combination of design and functionality is great. Our site's conversion rate has increased significantly." },
-        { name: "Sardor Aliyev", role: "Startup Founder", text: "A master of his craft. He can find simple and effective solutions to complex problems. I recommend him!" }
+       { name: "Mijoz", role: "Mebel Do`koni", text: "Sanjarbek bizning saytimizni ajoyib va sifatli tarzda ishlab chiqdi" }
       ]
     },
     footer: {
